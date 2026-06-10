@@ -7,18 +7,6 @@ A wrapper around [riverpod](https://pub.dev/packages/riverpod)'s `Mutation` that
 - Pre-bound mutation callbacks with an `InputR` type parameter
 - Full `ProviderListenable<MutationState<ResultT>>` integration — listen to idle/pending/success/error states
 - Thin wrapper: delegates directly to `Mutation.run` and `Mutation.reset`
-- Supports async error handling via `MutationError`
-
-## Getting started
-
-```yaml
-dependencies:
-  bound_mutation:
-    path: ..
-  flutter_riverpod: ^3.3.1
-```
-
-Requires Dart SDK `^3.12.1` and Flutter `>=1.17.0`.
 
 ## Usage
 
@@ -29,8 +17,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 // Define a bound mutation: ResultT = String, InputR = int
 final createUser = BoundMutation<String, int>(
   (transaction, userId) async {
-    // transaction gives access to provider reads
-    final repo = transaction.read(userRepositoryProvider);
+    // transaction gives access to providers
+    final repo = transaction.get(userRepositoryProvider);
     return repo.fetchUserName(userId);
   },
 );

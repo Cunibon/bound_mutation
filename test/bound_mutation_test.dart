@@ -1,5 +1,5 @@
 import 'package:bound_mutation/bound_mutation.dart';
-import 'package:flutter_test/flutter_test.dart';
+import 'package:test/test.dart';
 import 'package:riverpod/experimental/mutation.dart';
 import 'package:riverpod/misc.dart';
 import 'package:riverpod/riverpod.dart';

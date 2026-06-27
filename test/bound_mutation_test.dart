@@ -1,9 +1,8 @@
-import 'package:flutter_riverpod/experimental/mutation.dart';
-import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:flutter_riverpod/misc.dart';
-import 'package:flutter_test/flutter_test.dart';
-
 import 'package:bound_mutation/bound_mutation.dart';
+import 'package:flutter_test/flutter_test.dart';
+import 'package:riverpod/experimental/mutation.dart';
+import 'package:riverpod/misc.dart';
+import 'package:riverpod/riverpod.dart';
 
 void main() {
   group('BoundMutation', () {
@@ -35,9 +34,7 @@ void main() {
       });
 
       test('can be created with void ResultT', () {
-        final bm = BoundMutation<void, String>(
-          (transaction, input) async {},
-        );
+        final bm = BoundMutation<void, String>((transaction, input) async {});
         expect(bm, isNotNull);
       });
 
@@ -111,10 +108,7 @@ void main() {
           (transaction, input) async => input.length,
         );
         expect(bm.source, isNotNull);
-        expect(
-          bm.source,
-          isA<ProviderListenable<MutationState<int>>>(),
-        );
+        expect(bm.source, isA<ProviderListenable<MutationState<int>>>());
       });
 
       test('source is same object across multiple accesses', () {
@@ -154,13 +148,11 @@ void main() {
         String? capturedInput;
         MutationTransaction? capturedTransaction;
 
-        final bm = BoundMutation<int, String>(
-          (transaction, input) async {
-            capturedTransaction = transaction;
-            capturedInput = input;
-            return input.length;
-          },
-        );
+        final bm = BoundMutation<int, String>((transaction, input) async {
+          capturedTransaction = transaction;
+          capturedInput = input;
+          return input.length;
+        });
 
         await bm.run(container, 'test');
 
@@ -174,13 +166,12 @@ void main() {
         );
         final states = <MutationState<int>>[];
 
-        final subscription = container.listen<MutationState<int>>(
-          bm,
-          (prev, next) {
-            states.add(next);
-          },
-          fireImmediately: true,
-        );
+        final subscription = container.listen<MutationState<int>>(bm, (
+          prev,
+          next,
+        ) {
+          states.add(next);
+        }, fireImmediately: true);
 
         final result = await bm.run(container, 'hello');
 
@@ -196,20 +187,14 @@ void main() {
 
       test('handles errors and transitions to error state', () async {
         final exception = Exception('test error');
-        final bm = BoundMutation<int, String>(
-          (transaction, input) async {
-            throw exception;
-          },
-        );
+        final bm = BoundMutation<int, String>((transaction, input) async {
+          throw exception;
+        });
         final states = <MutationState<int>>[];
 
-        container.listen<MutationState<int>>(
-          bm,
-          (prev, next) {
-            states.add(next);
-          },
-          fireImmediately: true,
-        );
+        container.listen<MutationState<int>>(bm, (prev, next) {
+          states.add(next);
+        }, fireImmediately: true);
 
         await expectLater(
           bm.run(container, 'hello'),
@@ -236,12 +221,10 @@ void main() {
 
       test('can run multiple times accumulating results', () async {
         var counter = 0;
-        final bm = BoundMutation<int, void>(
-          (transaction, input) async {
-            counter++;
-            return counter;
-          },
-        );
+        final bm = BoundMutation<int, void>((transaction, input) async {
+          counter++;
+          return counter;
+        });
 
         expect(await bm.run(container, null), 1);
         expect(await bm.run(container, null), 2);
@@ -250,11 +233,9 @@ void main() {
 
       test('void mutation runs and completes', () async {
         var called = false;
-        final bm = BoundMutation<void, String>(
-          (transaction, input) async {
-            called = true;
-          },
-        );
+        final bm = BoundMutation<void, String>((transaction, input) async {
+          called = true;
+        });
 
         await bm.run(container, 'test');
         expect(called, isTrue);
@@ -268,13 +249,9 @@ void main() {
         );
         final states = <MutationState<int>>[];
 
-        container.listen<MutationState<int>>(
-          bm,
-          (prev, next) {
-            states.add(next);
-          },
-          fireImmediately: true,
-        );
+        container.listen<MutationState<int>>(bm, (prev, next) {
+          states.add(next);
+        }, fireImmediately: true);
 
         await bm.run(container, 'hello');
 
@@ -288,20 +265,14 @@ void main() {
       });
 
       test('resets mutation state back to idle after error', () async {
-        final bm = BoundMutation<int, String>(
-          (transaction, input) async {
-            throw Exception('error');
-          },
-        );
+        final bm = BoundMutation<int, String>((transaction, input) async {
+          throw Exception('error');
+        });
         final states = <MutationState<int>>[];
 
-        container.listen<MutationState<int>>(
-          bm,
-          (prev, next) {
-            states.add(next);
-          },
-          fireImmediately: true,
-        );
+        container.listen<MutationState<int>>(bm, (prev, next) {
+          states.add(next);
+        }, fireImmediately: true);
 
         try {
           await bm.run(container, 'hello');
@@ -320,13 +291,9 @@ void main() {
         );
         final states = <MutationState<int>>[];
 
-        container.listen<MutationState<int>>(
-          bm,
-          (prev, next) {
-            states.add(next);
-          },
-          fireImmediately: true,
-        );
+        container.listen<MutationState<int>>(bm, (prev, next) {
+          states.add(next);
+        }, fireImmediately: true);
 
         // First state is Idle from fireImmediately
         expect(states.single.isIdle, isTrue);
@@ -358,13 +325,12 @@ void main() {
         );
         final states = <MutationState<int>>[];
 
-        final subscription = container.listen<MutationState<int>>(
-          bm,
-          (prev, next) {
-            states.add(next);
-          },
-          fireImmediately: true,
-        );
+        final subscription = container.listen<MutationState<int>>(bm, (
+          prev,
+          next,
+        ) {
+          states.add(next);
+        }, fireImmediately: true);
 
         expect(states.length, 1);
         expect(states.first.isIdle, isTrue);
@@ -378,13 +344,9 @@ void main() {
         );
         final states = <MutationState<int>>[];
 
-        container.listen<MutationState<int>>(
-          bm,
-          (prev, next) {
-            states.add(next);
-          },
-          fireImmediately: true,
-        );
+        container.listen<MutationState<int>>(bm, (prev, next) {
+          states.add(next);
+        }, fireImmediately: true);
 
         await bm.run(container, 'x');
         bm.reset(container);
@@ -404,20 +366,12 @@ void main() {
         final states1 = <MutationState<int>>[];
         final states2 = <MutationState<int>>[];
 
-        container.listen<MutationState<int>>(
-          bm,
-          (prev, next) {
-            states1.add(next);
-          },
-          fireImmediately: true,
-        );
-        container.listen<MutationState<int>>(
-          bm,
-          (prev, next) {
-            states2.add(next);
-          },
-          fireImmediately: true,
-        );
+        container.listen<MutationState<int>>(bm, (prev, next) {
+          states1.add(next);
+        }, fireImmediately: true);
+        container.listen<MutationState<int>>(bm, (prev, next) {
+          states2.add(next);
+        }, fireImmediately: true);
 
         await bm.run(container, 'test');
 
@@ -433,13 +387,12 @@ void main() {
         );
         final states = <MutationState<int>>[];
 
-        final subscription = container.listen<MutationState<int>>(
-          bm,
-          (prev, next) {
-            states.add(next);
-          },
-          fireImmediately: true,
-        );
+        final subscription = container.listen<MutationState<int>>(bm, (
+          prev,
+          next,
+        ) {
+          states.add(next);
+        }, fireImmediately: true);
 
         subscription.close();
         states.clear();
@@ -452,12 +405,10 @@ void main() {
 
     group('edge cases', () {
       test('callback that returns Future with delay', () async {
-        final bm = BoundMutation<int, String>(
-          (transaction, input) async {
-            await Future<void>.delayed(const Duration(milliseconds: 10));
-            return input.length;
-          },
-        );
+        final bm = BoundMutation<int, String>((transaction, input) async {
+          await Future<void>.delayed(const Duration(milliseconds: 10));
+          return input.length;
+        });
 
         final result = await bm.run(container, 'delayed');
         expect(result, 7);

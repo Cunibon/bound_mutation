@@ -1,3 +1,7 @@
+## 1.0.2
+
+- switch to riverpod from flutter_riverpod
+
 ## 1.0.1
 
 - relax dependencies

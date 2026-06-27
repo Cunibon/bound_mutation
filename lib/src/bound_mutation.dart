@@ -1,5 +1,5 @@
-import 'package:flutter_riverpod/experimental/mutation.dart';
-import 'package:flutter_riverpod/misc.dart';
+import 'package:riverpod/experimental/mutation.dart';
+import 'package:riverpod/misc.dart';
 
 final class BoundMutation<ResultT, InputR>
     with

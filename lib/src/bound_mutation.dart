@@ -1,13 +1,13 @@
 import 'package:riverpod/experimental/mutation.dart';
 import 'package:riverpod/misc.dart';
+import 'package:riverpod/riverpod.dart';
 
 final class BoundMutation<ResultT, InputR>
-    with
-        SyncProviderTransformerMixin<
+    extends
+        CustomProviderListenable<
           MutationState<ResultT>,
           MutationState<ResultT>
-        >
-    implements ProviderListenable<MutationState<ResultT>> {
+        > {
   BoundMutation(this.cb, {Object? label})
     : _mutation = Mutation<ResultT>(label: label);
 
@@ -25,17 +25,12 @@ final class BoundMutation<ResultT, InputR>
   ProviderListenable<MutationState<ResultT>> get source => _mutation;
 
   @override
-  ProviderTransformer<MutationState<ResultT>, MutationState<ResultT>> transform(
-    ProviderTransformerContext<MutationState<ResultT>, MutationState<ResultT>>
-    context,
-  ) {
-    return ProviderTransformer(
-      initState: (self) => context.sourceState.requireValue,
-      listener: (self, prev, next) {
-        self.state = next;
-      },
-    );
-  }
+  ProviderTransformer2<
+    MutationState<ResultT>,
+    MutationState<ResultT>,
+    BoundMutation<ResultT, InputR>
+  >
+  createTransformer() => _BoundMutationTransformer<ResultT, InputR>();
 
   @override
   bool operator ==(Object other) {
@@ -51,4 +46,23 @@ final class BoundMutation<ResultT, InputR>
   @override
   String toString() =>
       'BoundMutation<$ResultT,$InputR> | ${_mutation.toString()}';
+}
+
+final class _BoundMutationTransformer<ResultT, InputR>
+    extends
+        SyncProviderTransformer2<
+          MutationState<ResultT>,
+          MutationState<ResultT>,
+          BoundMutation<ResultT, InputR>
+        > {
+  @override
+  MutationState<ResultT> initState() => sourceState.requireValue;
+
+  @override
+  void onEvent(
+    AsyncResult<MutationState<ResultT>> prev,
+    AsyncResult<MutationState<ResultT>> next,
+  ) {
+    state = next;
+  }
 }

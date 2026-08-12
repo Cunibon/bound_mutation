@@ -1,3 +1,15 @@
+## 2.0.0
+
+- migrate to `CustomProviderListenable`/`SyncProviderTransformer2`, replacing the
+  `SyncProviderTransformerMixin`, `ProviderTransformer` and
+  `ProviderTransformerContext` APIs deprecated in riverpod 3.4.0
+- **Breaking:** requires riverpod `^3.4.0` (was `^3.0.0`)
+- **Breaking:** requires Dart SDK `^3.12.0` (was `^3.8.0`), as mandated by
+  riverpod 3.4.0
+
+`BoundMutation` still implements `ProviderListenable<MutationState<ResultT>>`, so
+`ref.watch`, `container.listen`, `run` and `reset` are unchanged.
+
 ## 1.0.3
 
 - remove flutter dependency

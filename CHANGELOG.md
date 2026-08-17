@@ -1,3 +1,9 @@
+## 2.1.0
+
+- Adds `BoundAction<ResultT>` — a mutation without input
+- `BoundMutation<ResultT, InputR>` keeps its required input; both share the same
+  `ProviderListenable<MutationState<ResultT>>` integration
+
 ## 2.0.0
 
 - migrate to `CustomProviderListenable`/`SyncProviderTransformer2`, replacing the

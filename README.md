@@ -4,7 +4,8 @@ A wrapper around [riverpod](https://pub.dev/packages/riverpod)'s `Mutation` that
 
 ## Features
 
-- Pre-bound mutation callbacks with an `InputR` type parameter
+- `BoundMutation<ResultT, InputR>` — mutation with an input parameter passed to `run`
+- `BoundAction<ResultT>` — mutation without input
 - Full `ProviderListenable<MutationState<ResultT>>` integration — listen to idle/pending/success/error states
 - Thin wrapper: delegates directly to `Mutation.run` and `Mutation.reset`
 
@@ -54,14 +55,27 @@ createUser.reset(container);
 container.dispose();
 ```
 
+### `BoundAction<ResultT>` — mutation without input
+
+```dart
+final refreshFeed = BoundAction<void>((transaction) async {
+  final repo = transaction.get(feedRepositoryProvider);
+  await repo.refresh();
+});
+
+await refreshFeed.run(ref);
+```
+
 ## API
 
 | Method | Description |
 |--------|-------------|
 | `BoundMutation(cb, {label})` | Creates a mutation with a callback `(transaction, input) -> Future<ResultT>` |
-| `run(target, input)` | Executes the mutation, returning `Future<ResultT>` |
+| `BoundMutation.run(target, input)` | Executes the mutation, returning `Future<ResultT>` |
+| `BoundAction(cb, {label})` | Creates a mutation without input, callback `(transaction) -> Future<ResultT>` |
+| `BoundAction.run(target)` | Executes the mutation, returning `Future<ResultT>` |
 | `reset(target)` | Resets the mutation state back to `MutationIdle` |
 | `source` | Returns the underlying `Mutation<ResultT>` |
 | `==` / `hashCode` | Delegates to the internal `Mutation` |
 
-`BoundMutation` implements `ProviderListenable<MutationState<ResultT>>`, so it can be watched via `ref.watch()` or `container.listen()`.
+`BoundMutation` and `BoundAction` implement `ProviderListenable<MutationState<ResultT>>`, so they can be watched via `ref.watch()` or `container.listen()`.

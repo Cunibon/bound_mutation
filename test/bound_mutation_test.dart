@@ -435,4 +435,223 @@ void main() {
       });
     });
   });
+
+  group('BoundAction', () {
+    late ProviderContainer container;
+
+    setUp(() {
+      container = ProviderContainer();
+    });
+
+    tearDown(() {
+      container.dispose();
+    });
+
+    group('construction', () {
+      test('can be created with callback and label', () {
+        final ba = BoundAction<int>((transaction) async => 42,
+            label: 'my-label');
+        expect(ba, isNotNull);
+        expect(ba.toString(), contains('my-label'));
+      });
+
+      test('can be created without label', () {
+        final ba = BoundAction<int>((transaction) async => 42);
+        expect(ba, isNotNull);
+      });
+
+      test('can be created with void ResultT', () {
+        final ba = BoundAction<void>((transaction) async {});
+        expect(ba, isNotNull);
+      });
+    });
+
+    group('toString', () {
+      test('returns formatted string with type parameter', () {
+        final ba = BoundAction<int>((transaction) async => 42);
+        expect(ba.toString(), contains('BoundAction<int>'));
+      });
+    });
+
+    group('equality', () {
+      test('same instance is equal to itself', () {
+        final ba = BoundAction<int>((transaction) async => 42);
+        expect(ba, equals(ba));
+      });
+
+      test('different instances are not equal', () {
+        final ba1 = BoundAction<int>((transaction) async => 42);
+        final ba2 = BoundAction<int>((transaction) async => 42);
+        expect(ba1, isNot(equals(ba2)));
+      });
+
+      test('is not equal to a BoundMutation', () {
+        final ba = BoundAction<int>((transaction) async => 42);
+        final bm = BoundMutation<int, String>(
+          (transaction, input) async => input.length,
+        );
+        expect(ba, isNot(equals(bm)));
+        expect(bm, isNot(equals(ba)));
+      });
+
+      test('hashCode is consistent with equality', () {
+        final ba1 = BoundAction<int>((transaction) async => 42);
+        final ba2 = BoundAction<int>((transaction) async => 42);
+        expect(ba1.hashCode, equals(ba1.hashCode));
+        expect(ba1.hashCode, isNot(equals(ba2.hashCode)));
+      });
+    });
+
+    group('source', () {
+      test('returns internal Mutation as ProviderListenable', () {
+        final ba = BoundAction<int>((transaction) async => 42);
+        expect(ba.source, isNotNull);
+        expect(ba.source, isA<ProviderListenable<MutationState<int>>>());
+      });
+    });
+
+    group('run', () {
+      test('executes callback and returns result', () async {
+        final ba = BoundAction<int>((transaction) async => 42);
+        final result = await ba.run(container);
+        expect(result, 42);
+      });
+
+      test('callback receives transaction', () async {
+        MutationTransaction? capturedTransaction;
+
+        final ba = BoundAction<int>((transaction) async {
+          capturedTransaction = transaction;
+          return 42;
+        });
+
+        await ba.run(container);
+
+        expect(capturedTransaction, isNotNull);
+      });
+
+      test('mutation state transitions through pending to success', () async {
+        final ba = BoundAction<int>((transaction) async => 42);
+        final states = <MutationState<int>>[];
+
+        final subscription = container.listen<MutationState<int>>(ba, (
+          prev,
+          next,
+        ) {
+          states.add(next);
+        }, fireImmediately: true);
+
+        final result = await ba.run(container);
+
+        expect(result, 42);
+        expect(states.length, greaterThanOrEqualTo(3));
+        expect(states.first.isIdle, isTrue);
+        expect(states[1].isPending, isTrue);
+        expect(states.last.isSuccess, isTrue);
+        expect((states.last as MutationSuccess<int>).value, 42);
+
+        subscription.close();
+      });
+
+      test('handles errors and transitions to error state', () async {
+        final exception = Exception('test error');
+        final ba = BoundAction<int>((transaction) async {
+          throw exception;
+        });
+        final states = <MutationState<int>>[];
+
+        container.listen<MutationState<int>>(ba, (prev, next) {
+          states.add(next);
+        }, fireImmediately: true);
+
+        await expectLater(ba.run(container), throwsA(equals(exception)));
+
+        expect(states.first.isIdle, isTrue);
+        expect(states[1].isPending, isTrue);
+        expect(states.last.hasError, isTrue);
+        expect((states.last as MutationError<int>).error, equals(exception));
+      });
+
+      test('can run multiple times accumulating results', () async {
+        var counter = 0;
+        final ba = BoundAction<int>((transaction) async {
+          counter++;
+          return counter;
+        });
+
+        expect(await ba.run(container), 1);
+        expect(await ba.run(container), 2);
+        expect(await ba.run(container), 3);
+      });
+    });
+
+    group('reset', () {
+      test('resets mutation state back to idle after successful run', () async {
+        final ba = BoundAction<int>((transaction) async => 42);
+        final states = <MutationState<int>>[];
+
+        container.listen<MutationState<int>>(ba, (prev, next) {
+          states.add(next);
+        }, fireImmediately: true);
+
+        await ba.run(container);
+
+        states.clear();
+
+        ba.reset(container);
+
+        expect(states.length, 1);
+        expect(states.single.isIdle, isTrue);
+      });
+
+      test('can run again after reset', () async {
+        var counter = 0;
+        final ba = BoundAction<int>((transaction) async {
+          counter++;
+          return counter;
+        });
+
+        expect(await ba.run(container), 1);
+        ba.reset(container);
+        expect(await ba.run(container), 2);
+      });
+    });
+
+    group('ProviderListenable integration', () {
+      test('can be listened to via ProviderContainer', () {
+        final ba = BoundAction<int>((transaction) async => 42);
+        final states = <MutationState<int>>[];
+
+        final subscription = container.listen<MutationState<int>>(ba, (
+          prev,
+          next,
+        ) {
+          states.add(next);
+        }, fireImmediately: true);
+
+        expect(states.length, 1);
+        expect(states.first.isIdle, isTrue);
+
+        subscription.close();
+      });
+
+      test('listener receives all state transitions', () async {
+        final ba = BoundAction<int>((transaction) async => 42);
+        final states = <MutationState<int>>[];
+
+        container.listen<MutationState<int>>(ba, (prev, next) {
+          states.add(next);
+        }, fireImmediately: true);
+
+        await ba.run(container);
+        ba.reset(container);
+
+        expect(states.length, 4);
+        expect(states[0].isIdle, isTrue);
+        expect(states[1].isPending, isTrue);
+        expect(states[2].isSuccess, isTrue);
+        expect(states[3].isIdle, isTrue);
+      });
+    });
+  });
 }

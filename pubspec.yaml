@@ -1,6 +1,6 @@
 name: bound_mutation
 description: "A small wrapper class around Riverpod Mutations to bind a function to a mutation."
-version: 2.1.0
+version: 2.2.0
 repository: https://github.com/Cunibon/bound_mutation
 
 environment:

@@ -1,3 +1,13 @@
+## 2.2.0
+
+- Adds `cascade` to `BoundMutation` and `BoundAction` — runs the bound callback
+  inside an existing `MutationTransaction`, leaving the mutation's own state
+  untouched
+- Documents the public API
+- Adds a runnable pure Dart example in `example/main.dart`
+- **Breaking:** the `cb` field is now private (`_cb`). Use `run` to execute the
+  mutation or `cascade` to reuse its callback inside another mutation
+
 ## 2.1.0
 
 - Adds `BoundAction<ResultT>` — a mutation without input

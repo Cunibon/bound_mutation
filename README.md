@@ -11,6 +11,10 @@ A wrapper around [riverpod](https://pub.dev/packages/riverpod)'s `Mutation` that
 
 ## Usage
 
+A complete, runnable example lives in [`example/main.dart`](example/main.dart)
+(`dart run example/main.dart`) — it covers `run`, error states, `reset` and
+`cascade` without needing Flutter.
+
 ```dart
 import 'package:bound_mutation/bound_mutation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -66,14 +70,29 @@ final refreshFeed = BoundAction<void>((transaction) async {
 await refreshFeed.run(ref);
 ```
 
+### `cascade` — reusing a mutation inside another one
+
+Call `cascade` from within another mutation's callback to reuse its logic in the
+same transaction. The cascaded mutation is not run, so its state stays as it is —
+only the outer mutation reports pending/success/error:
+
+```dart
+final refreshEverything = BoundAction<void>((transaction) async {
+  await refreshFeed.cascade(transaction);
+  await createUser.cascade(transaction, 42);
+});
+```
+
 ## API
 
 | Method | Description |
 |--------|-------------|
 | `BoundMutation(cb, {label})` | Creates a mutation with a callback `(transaction, input) -> Future<ResultT>` |
 | `BoundMutation.run(target, input)` | Executes the mutation, returning `Future<ResultT>` |
+| `BoundMutation.cascade(tsx, input)` | Runs the callback inside an existing transaction, leaving this mutation's state untouched |
 | `BoundAction(cb, {label})` | Creates a mutation without input, callback `(transaction) -> Future<ResultT>` |
 | `BoundAction.run(target)` | Executes the mutation, returning `Future<ResultT>` |
+| `BoundAction.cascade(tsx)` | Runs the callback inside an existing transaction, leaving this mutation's state untouched |
 | `reset(target)` | Resets the mutation state back to `MutationIdle` |
 | `source` | Returns the underlying `Mutation<ResultT>` |
 | `==` / `hashCode` | Delegates to the internal `Mutation` |

@@ -1,3 +1,12 @@
+## 2.3.0
+
+- Adds key support to `BoundMutation` and `BoundAction`, mirroring riverpod's
+  `Mutation.call`: `deleteUser(id)` returns an instance with the same callback
+  but a state of its own, so `run`, `reset` and watching are scoped to that key
+- Adds `key`, which exposes the key an instance is scoped to (`null` when
+  unkeyed)
+- Documents keys in the README and the example
+
 ## 2.2.0
 
 - Adds `cascade` to `BoundMutation` and `BoundAction` — runs the bound callback

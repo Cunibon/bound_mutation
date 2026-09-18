@@ -6,14 +6,15 @@ A wrapper around [riverpod](https://pub.dev/packages/riverpod)'s `Mutation` that
 
 - `BoundMutation<ResultT, InputR>` — mutation with an input parameter passed to `run`
 - `BoundAction<ResultT>` — mutation without input
+- Keys — `deleteUser(id)` gives every id its own idle/pending/success/error state
 - Full `ProviderListenable<MutationState<ResultT>>` integration — listen to idle/pending/success/error states
 - Thin wrapper: delegates directly to `Mutation.run` and `Mutation.reset`
 
 ## Usage
 
 A complete, runnable example lives in [`example/main.dart`](example/main.dart)
-(`dart run example/main.dart`) — it covers `run`, error states, `reset` and
-`cascade` without needing Flutter.
+(`dart run example/main.dart`) — it covers `run`, error states, `reset`,
+`cascade` and keys without needing Flutter.
 
 ```dart
 import 'package:bound_mutation/bound_mutation.dart';
@@ -83,6 +84,48 @@ final refreshEverything = BoundAction<void>((transaction) async {
 });
 ```
 
+### Keys — one state per value
+
+By default every run writes to the same state, so a single `deleteUser` mutation
+cannot tell which user is currently being deleted. Calling the mutation with a
+key returns an instance with a state of its own, exactly like riverpod's
+`Mutation.call`:
+
+```dart
+final deleteUser = BoundMutation<void, int>((transaction, userId) async {
+  await transaction.get(userRepositoryProvider).delete(userId);
+});
+
+// In a list, each row watches and runs its own key:
+Widget build(BuildContext context, WidgetRef ref) {
+  final state = ref.watch(deleteUser(user.id));
+
+  return ElevatedButton(
+    onPressed: state.isPending
+        ? null
+        : () => deleteUser(user.id).run(ref, user.id),
+    child: state.isPending ? const CircularProgressIndicator() : const Text('Delete'),
+  );
+}
+```
+
+The key is not derived from the input — watching and running have to pass the
+same key explicitly. Keys are matched with `==`, so custom key objects should
+override `==`/`hashCode`; use a record for a composite key
+(`deleteUser((user.id, listId))`).
+
+Keyed instances are independent of the unkeyed one and of each other: `run`,
+`reset` and watching only ever affect the state of the key they were used with.
+Two instances created from the same key compare equal, so calling `deleteUser(id)`
+inline in a build method is safe.
+
+`BoundAction` works the same way:
+
+```dart
+final state = ref.watch(syncDevice(device.id));
+await syncDevice(device.id).run(ref);
+```
+
 ## API
 
 | Method | Description |
@@ -93,7 +136,9 @@ final refreshEverything = BoundAction<void>((transaction) async {
 | `BoundAction(cb, {label})` | Creates a mutation without input, callback `(transaction) -> Future<ResultT>` |
 | `BoundAction.run(target)` | Executes the mutation, returning `Future<ResultT>` |
 | `BoundAction.cascade(tsx)` | Runs the callback inside an existing transaction, leaving this mutation's state untouched |
-| `reset(target)` | Resets the mutation state back to `MutationIdle` |
+| `bound(key)` (`call`) | Returns an instance with the same callback whose state is scoped to `key` |
+| `key` | The key this instance is scoped to, or `null` if it is unkeyed |
+| `reset(target)` | Resets the mutation state back to `MutationIdle` (of this key only) |
 | `source` | Returns the underlying `Mutation<ResultT>` |
 | `==` / `hashCode` | Delegates to the internal `Mutation` |
 

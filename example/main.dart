@@ -15,6 +15,11 @@ class TodoRepository {
     return title;
   }
 
+  Future<void> remove(String title) async {
+    await Future<void>.delayed(const Duration(milliseconds: 50));
+    _todos.remove(title);
+  }
+
   Future<void> clear() async {
     await Future<void>.delayed(const Duration(milliseconds: 50));
     _todos.clear();
@@ -43,6 +48,13 @@ final resetTodos = BoundAction<void>((transaction) async {
   await clearTodos.cascade(transaction);
   await addTodo.cascade(transaction, 'Buy milk');
 }, label: 'resetTodos');
+
+///Keys give one mutation a state per value. Without one, removing two todos
+///at once would share a single pending/success/error state.
+final removeTodo = BoundMutation<void, String>((transaction, title) async {
+  final repository = transaction.get(todoRepositoryProvider);
+  await repository.remove(title);
+}, label: 'removeTodo');
 
 Future<void> main() async {
   final container = ProviderContainer();
@@ -77,6 +89,20 @@ Future<void> main() async {
   print('todos: ${container.read(todoRepositoryProvider).todos}');
   //addTodo ran as part of resetTodos, but only via cascade, so it is still idle.
   print('addTodo is still ${describe(container.read(addTodo))}');
+
+  print('\n--- keys: one state per todo ---');
+  //Both keys are watched, but only the one that is run reports progress.
+  for (final title in ['Buy milk', 'Walk the dog']) {
+    container.listen<MutationState<void>>(removeTodo(title), (previous, next) {
+      print('removeTodo($title) -> ${describe(next)}');
+    }, fireImmediately: true);
+  }
+  //The key is passed explicitly, next to the input: they are not the same
+  //thing, even when they happen to hold the same value.
+  await removeTodo('Buy milk').run(container, 'Buy milk');
+  print('todos: ${container.read(todoRepositoryProvider).todos}');
+  //The unkeyed mutation has a state of its own and stays idle as well.
+  print('removeTodo (unkeyed) is ${describe(container.read(removeTodo))}');
 
   container.dispose();
 }

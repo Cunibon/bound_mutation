@@ -403,6 +403,194 @@ void main() {
       });
     });
 
+    group('keys', () {
+      test('is unkeyed by default', () {
+        final bm = BoundMutation<int, String>(
+          (transaction, input) async => input.length,
+        );
+        expect(bm.key, isNull);
+      });
+
+      test('call exposes the key', () {
+        final bm = BoundMutation<int, String>(
+          (transaction, input) async => input.length,
+        );
+        expect(bm('a').key, 'a');
+        expect(bm(null).key, isNull);
+      });
+
+      test('keeps the label', () {
+        final bm = BoundMutation<int, String>(
+          (transaction, input) async => input.length,
+          label: 'my-label',
+        );
+        expect(bm('a').toString(), contains('my-label'));
+        expect(bm('a').toString(), contains('a'));
+      });
+
+      test('same key is equal, different key is not', () {
+        final bm = BoundMutation<int, String>(
+          (transaction, input) async => input.length,
+        );
+        expect(bm('a'), equals(bm('a')));
+        expect(bm('a').hashCode, equals(bm('a').hashCode));
+        expect(bm('a'), isNot(equals(bm('b'))));
+      });
+
+      test('keyed is not equal to unkeyed', () {
+        final bm = BoundMutation<int, String>(
+          (transaction, input) async => input.length,
+        );
+        expect(bm('a'), isNot(equals(bm)));
+        expect(bm, isNot(equals(bm('a'))));
+      });
+
+      test('same key on different mutations is not equal', () {
+        final bm1 = BoundMutation<int, String>(
+          (transaction, input) async => input.length,
+        );
+        final bm2 = BoundMutation<int, String>(
+          (transaction, input) async => input.length,
+        );
+        expect(bm1('a'), isNot(equals(bm2('a'))));
+      });
+
+      test('record keys work', () {
+        final bm = BoundMutation<int, String>(
+          (transaction, input) async => input.length,
+        );
+        expect(bm((1, 'a')), equals(bm((1, 'a'))));
+        expect(bm((1, 'a')), isNot(equals(bm((2, 'a')))));
+      });
+
+      test('keyed run executes the same callback', () async {
+        final bm = BoundMutation<int, String>(
+          (transaction, input) async => input.length,
+        );
+        expect(await bm('a').run(container, 'hello'), 5);
+      });
+
+      test('keyed run only changes the state of that key', () async {
+        final bm = BoundMutation<int, String>(
+          (transaction, input) async => input.length,
+        );
+        final keyA = <MutationState<int>>[];
+        final keyB = <MutationState<int>>[];
+        final unkeyed = <MutationState<int>>[];
+
+        container.listen<MutationState<int>>(bm('a'), (prev, next) {
+          keyA.add(next);
+        }, fireImmediately: true);
+        container.listen<MutationState<int>>(bm('b'), (prev, next) {
+          keyB.add(next);
+        }, fireImmediately: true);
+        container.listen<MutationState<int>>(bm, (prev, next) {
+          unkeyed.add(next);
+        }, fireImmediately: true);
+
+        await bm('a').run(container, 'hello');
+
+        expect(keyA.length, 3);
+        expect(keyA[0].isIdle, isTrue);
+        expect(keyA[1].isPending, isTrue);
+        expect(keyA[2].isSuccess, isTrue);
+        expect((keyA[2] as MutationSuccess<int>).value, 5);
+
+        expect(keyB.single.isIdle, isTrue);
+        expect(unkeyed.single.isIdle, isTrue);
+      });
+
+      test(
+        'a new instance for the same key resolves to the same state',
+        () async {
+          final bm = BoundMutation<int, String>(
+            (transaction, input) async => input.length,
+          );
+          final states = <MutationState<int>>[];
+
+          container.listen<MutationState<int>>(bm('a'), (prev, next) {
+            states.add(next);
+          }, fireImmediately: true);
+
+          //Watched and run through two different instances of the same key.
+          await bm('a').run(container, 'hi');
+
+          expect(states.last.isSuccess, isTrue);
+          expect((states.last as MutationSuccess<int>).value, 2);
+        },
+      );
+
+      test('reset only affects that key', () async {
+        final bm = BoundMutation<int, String>(
+          (transaction, input) async => input.length,
+        );
+        final keyA = <MutationState<int>>[];
+        final keyB = <MutationState<int>>[];
+
+        container.listen<MutationState<int>>(bm('a'), (prev, next) {
+          keyA.add(next);
+        }, fireImmediately: true);
+        container.listen<MutationState<int>>(bm('b'), (prev, next) {
+          keyB.add(next);
+        }, fireImmediately: true);
+
+        await bm('a').run(container, 'hello');
+        await bm('b').run(container, 'hi');
+        keyA.clear();
+        keyB.clear();
+
+        bm('a').reset(container);
+
+        expect(keyA.single.isIdle, isTrue);
+        expect(keyB, isEmpty);
+      });
+
+      test('keyed errors stay on their key', () async {
+        final exception = Exception('test error');
+        final bm = BoundMutation<int, String>((transaction, input) async {
+          throw exception;
+        });
+        final keyA = <MutationState<int>>[];
+        final keyB = <MutationState<int>>[];
+
+        container.listen<MutationState<int>>(bm('a'), (prev, next) {
+          keyA.add(next);
+        }, fireImmediately: true);
+        container.listen<MutationState<int>>(bm('b'), (prev, next) {
+          keyB.add(next);
+        }, fireImmediately: true);
+
+        await expectLater(
+          bm('a').run(container, 'hello'),
+          throwsA(equals(exception)),
+        );
+
+        expect(keyA.last.hasError, isTrue);
+        expect(keyB.single.isIdle, isTrue);
+      });
+
+      test(
+        'cascade from a keyed instance leaves every state untouched',
+        () async {
+          final bm = BoundMutation<int, String>(
+            (transaction, input) async => input.length,
+          );
+          final keyA = <MutationState<int>>[];
+
+          container.listen<MutationState<int>>(bm('a'), (prev, next) {
+            keyA.add(next);
+          }, fireImmediately: true);
+
+          final outer = BoundAction<int>(
+            (transaction) => bm('a').cascade(transaction, 'hello'),
+          );
+
+          expect(await outer.run(container), 5);
+          expect(keyA.single.isIdle, isTrue);
+        },
+      );
+    });
+
     group('edge cases', () {
       test('callback that returns Future with delay', () async {
         final bm = BoundMutation<int, String>((transaction, input) async {
@@ -449,8 +637,10 @@ void main() {
 
     group('construction', () {
       test('can be created with callback and label', () {
-        final ba = BoundAction<int>((transaction) async => 42,
-            label: 'my-label');
+        final ba = BoundAction<int>(
+          (transaction) async => 42,
+          label: 'my-label',
+        );
         expect(ba, isNotNull);
         expect(ba.toString(), contains('my-label'));
       });
@@ -651,6 +841,79 @@ void main() {
         expect(states[1].isPending, isTrue);
         expect(states[2].isSuccess, isTrue);
         expect(states[3].isIdle, isTrue);
+      });
+    });
+
+    group('keys', () {
+      test('is unkeyed by default', () {
+        final ba = BoundAction<int>((transaction) async => 42);
+        expect(ba.key, isNull);
+      });
+
+      test('call exposes the key', () {
+        final ba = BoundAction<int>((transaction) async => 42);
+        expect(ba('a').key, 'a');
+      });
+
+      test('same key is equal, different key is not', () {
+        final ba = BoundAction<int>((transaction) async => 42);
+        expect(ba('a'), equals(ba('a')));
+        expect(ba('a').hashCode, equals(ba('a').hashCode));
+        expect(ba('a'), isNot(equals(ba('b'))));
+        expect(ba('a'), isNot(equals(ba)));
+      });
+
+      test('is not equal to a BoundMutation with the same key', () {
+        final ba = BoundAction<int>((transaction) async => 42);
+        final bm = BoundMutation<int, String>(
+          (transaction, input) async => input.length,
+        );
+        expect(ba('a'), isNot(equals(bm('a'))));
+        expect(bm('a'), isNot(equals(ba('a'))));
+      });
+
+      test('keyed run only changes the state of that key', () async {
+        var counter = 0;
+        final ba = BoundAction<int>((transaction) async => ++counter);
+        final keyA = <MutationState<int>>[];
+        final keyB = <MutationState<int>>[];
+
+        container.listen<MutationState<int>>(ba('a'), (prev, next) {
+          keyA.add(next);
+        }, fireImmediately: true);
+        container.listen<MutationState<int>>(ba('b'), (prev, next) {
+          keyB.add(next);
+        }, fireImmediately: true);
+
+        expect(await ba('a').run(container), 1);
+
+        expect(keyA.length, 3);
+        expect(keyA[1].isPending, isTrue);
+        expect(keyA[2].isSuccess, isTrue);
+        expect(keyB.single.isIdle, isTrue);
+      });
+
+      test('reset only affects that key', () async {
+        final ba = BoundAction<int>((transaction) async => 42);
+        final keyA = <MutationState<int>>[];
+        final keyB = <MutationState<int>>[];
+
+        container.listen<MutationState<int>>(ba('a'), (prev, next) {
+          keyA.add(next);
+        }, fireImmediately: true);
+        container.listen<MutationState<int>>(ba('b'), (prev, next) {
+          keyB.add(next);
+        }, fireImmediately: true);
+
+        await ba('a').run(container);
+        await ba('b').run(container);
+        keyA.clear();
+        keyB.clear();
+
+        ba('a').reset(container);
+
+        expect(keyA.single.isIdle, isTrue);
+        expect(keyB, isEmpty);
       });
     });
   });
